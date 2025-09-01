@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Virtual React Table</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-window/umd/react-window.development.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/javascript">
+      const { FixedSizeList } = window["ReactWindow"];
+      const data = Array.from({ length: 1000 }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}` }));
+
+      const Row = ({ index, style }) => (
+        React.createElement("div", { style }, `${data[index].id} - ${data[index].name}`)
+      );
+
+      const App = () =>
+        React.createElement(FixedSizeList, {
+          height: 300,
+          itemCount: data.length,
+          itemSize: 35,
+          width: 300,
+        }, Row);
+
+      ReactDOM.createRoot(document.getElementById("root")).render(
+        React.createElement(App)
+      );
+    </script>
+  </body>
+</html>
