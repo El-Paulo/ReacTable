@@ -47,8 +47,19 @@ const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
 scene.add(light);
 
 // Audio context
-const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-audioCtx.resume();
+let audioCtx: AudioContext | null = null;
+
+function startAudio(): void {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    void audioCtx.resume();
+  }
+}
+
+document.getElementById('audioBtn')?.addEventListener('click', startAudio);
+window.addEventListener('pointerdown', startAudio, { once: true });
 
 const cubes: Cube[] = [];
 let connections: Connection[] = [];
@@ -70,30 +81,30 @@ function createCube(type: string, position: THREE.Vector3): Cube {
   let audioIn: AudioNode | null = null;
   let audioOut: AudioNode | null = null;
   if (type === 'osc') {
-    const osc = audioCtx.createOscillator();
+    const osc = audioCtx!.createOscillator();
     osc.type = 'sine';
-    const gain = audioCtx.createGain();
+    const gain = audioCtx!.createGain();
     gain.gain.value = 0.2;
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(audioCtx!.destination);
     osc.start();
     audioOut = gain;
     (mesh.userData as any).osc = osc;
   } else if (type === 'filter') {
-    const input = audioCtx.createGain();
-    const filter = audioCtx.createBiquadFilter();
+    const input = audioCtx!.createGain();
+    const filter = audioCtx!.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.value = 1000;
-    const output = audioCtx.createGain();
+    const output = audioCtx!.createGain();
     input.connect(filter);
     filter.connect(output);
-    output.connect(audioCtx.destination);
+    output.connect(audioCtx!.destination);
     audioIn = input;
     audioOut = output;
     (mesh.userData as any).filter = filter;
   } else if (type === 'output') {
-    const input = audioCtx.createGain();
-    input.connect(audioCtx.destination);
+    const input = audioCtx!.createGain();
+    input.connect(audioCtx!.destination);
     audioIn = input;
   }
 
