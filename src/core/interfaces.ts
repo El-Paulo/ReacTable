@@ -96,7 +96,7 @@ export enum CubeType {
 }
 
 export interface ConnectionManager {
-  updateConnections(cubes: CubeInstance[]): void;
+  updateConnections(cubes: Map<string, CubeInstance>): void;
   checkProximity(cube1: CubeInstance, cube2: CubeInstance): boolean;
   createConnection(fromId: string, toId: string): Connection;
   removeConnection(connectionId: string): void;
