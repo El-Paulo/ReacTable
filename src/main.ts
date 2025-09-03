@@ -8,6 +8,16 @@ interface Cube {
   audioOut: AudioNode | null;
 }
 
+interface OscillatorData {
+  osc: OscillatorNode;
+}
+
+interface FilterData {
+  filter: BiquadFilterNode;
+}
+
+type CubeUserData = OscillatorData | FilterData;
+
 interface Connection {
   from: Cube;
   to: Cube;
@@ -89,7 +99,7 @@ function createCube(type: string, position: THREE.Vector3): Cube {
     gain.connect(audioCtx!.destination);
     osc.start();
     audioOut = gain;
-    (mesh.userData as any).osc = osc;
+    (mesh.userData as OscillatorData).osc = osc;
   } else if (type === 'filter') {
     const input = audioCtx!.createGain();
     const filter = audioCtx!.createBiquadFilter();
@@ -101,7 +111,7 @@ function createCube(type: string, position: THREE.Vector3): Cube {
     output.connect(audioCtx!.destination);
     audioIn = input;
     audioOut = output;
-    (mesh.userData as any).filter = filter;
+    (mesh.userData as FilterData).filter = filter;
   } else if (type === 'output') {
     const input = audioCtx!.createGain();
     input.connect(audioCtx!.destination);
@@ -243,9 +253,10 @@ function onKeyUp(event: KeyboardEvent): void {
 function removeCube(cube: Cube): void {
   const idx = cubes.indexOf(cube);
   if (idx >= 0) {
-    if (cube.audioOut && (cube.audioOut as any).disconnect) cube.audioOut.disconnect();
-    if (cube.audioIn && (cube.audioIn as any).disconnect) cube.audioIn.disconnect();
-    if ((cube.mesh.userData as any).osc) (cube.mesh.userData as any).osc.stop();
+    if (cube.audioOut) cube.audioOut.disconnect();
+    if (cube.audioIn) cube.audioIn.disconnect();
+    const userData = cube.mesh.userData as CubeUserData;
+    if ('osc' in userData) userData.osc.stop();
     scene.remove(cube.mesh);
     cube.mesh.geometry.dispose();
     (cube.mesh.material as THREE.Material).dispose();
@@ -257,11 +268,12 @@ function removeCube(cube: Cube): void {
 
 function applyParams(cube: Cube): void {
   const rotY = cube.mesh.rotation.y;
-  if (cube.type === 'osc' && (cube.mesh.userData as any).osc) {
-    (cube.mesh.userData as any).osc.frequency.value = 220 + rotY * 100;
-  } else if (cube.type === 'filter' && (cube.mesh.userData as any).filter) {
+  const userData = cube.mesh.userData as CubeUserData;
+  if (cube.type === 'osc' && 'osc' in userData) {
+    userData.osc.frequency.value = 220 + rotY * 100;
+  } else if (cube.type === 'filter' && 'filter' in userData) {
     const freq = THREE.MathUtils.clamp(1000 + rotY * 500, 100, 5000);
-    (cube.mesh.userData as any).filter.frequency.value = freq;
+    userData.filter.frequency.value = freq;
   } else if (cube.type === 'output' && cube.audioIn) {
     const vol = THREE.MathUtils.clamp(0.5 + rotY * 0.1, 0, 1);
     (cube.audioIn as GainNode).gain.value = vol;
