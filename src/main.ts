@@ -50,6 +50,30 @@ scene.add(light);
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
 audioCtx.resume();
 
+const audioNodes = new Set<AudioNode>();
+
+function track<T extends AudioNode>(node: T): T {
+  audioNodes.add(node);
+  return node;
+}
+
+function disposeAudioNode(node: AudioNode | null): void {
+  if (!node) return;
+  try {
+    node.disconnect();
+  } catch {
+    /* noop */
+  }
+  try {
+    if (typeof (node as any).stop === 'function') {
+      (node as any).stop();
+    }
+  } catch {
+    /* noop */
+  }
+  audioNodes.delete(node);
+}
+
 const cubes: Cube[] = [];
 let connections: Connection[] = [];
 let selected: Cube | null = null;
@@ -70,9 +94,9 @@ function createCube(type: string, position: THREE.Vector3): Cube {
   let audioIn: AudioNode | null = null;
   let audioOut: AudioNode | null = null;
   if (type === 'osc') {
-    const osc = audioCtx.createOscillator();
+    const osc = track(audioCtx.createOscillator());
     osc.type = 'sine';
-    const gain = audioCtx.createGain();
+    const gain = track(audioCtx.createGain());
     gain.gain.value = 0.2;
     osc.connect(gain);
     gain.connect(audioCtx.destination);
@@ -80,11 +104,11 @@ function createCube(type: string, position: THREE.Vector3): Cube {
     audioOut = gain;
     (mesh.userData as any).osc = osc;
   } else if (type === 'filter') {
-    const input = audioCtx.createGain();
-    const filter = audioCtx.createBiquadFilter();
+    const input = track(audioCtx.createGain());
+    const filter = track(audioCtx.createBiquadFilter());
     filter.type = 'lowpass';
     filter.frequency.value = 1000;
-    const output = audioCtx.createGain();
+    const output = track(audioCtx.createGain());
     input.connect(filter);
     filter.connect(output);
     output.connect(audioCtx.destination);
@@ -92,7 +116,7 @@ function createCube(type: string, position: THREE.Vector3): Cube {
     audioOut = output;
     (mesh.userData as any).filter = filter;
   } else if (type === 'output') {
-    const input = audioCtx.createGain();
+    const input = track(audioCtx.createGain());
     input.connect(audioCtx.destination);
     audioIn = input;
   }
@@ -232,9 +256,11 @@ function onKeyUp(event: KeyboardEvent): void {
 function removeCube(cube: Cube): void {
   const idx = cubes.indexOf(cube);
   if (idx >= 0) {
-    if (cube.audioOut && (cube.audioOut as any).disconnect) cube.audioOut.disconnect();
-    if (cube.audioIn && (cube.audioIn as any).disconnect) cube.audioIn.disconnect();
-    if ((cube.mesh.userData as any).osc) (cube.mesh.userData as any).osc.stop();
+    disposeAudioNode(cube.audioOut);
+    disposeAudioNode(cube.audioIn);
+    Object.values(cube.mesh.userData).forEach((n) => {
+      if (n instanceof AudioNode) disposeAudioNode(n);
+    });
     scene.remove(cube.mesh);
     cube.mesh.geometry.dispose();
     (cube.mesh.material as THREE.Material).dispose();
@@ -257,17 +283,26 @@ function applyParams(cube: Cube): void {
   }
 }
 
-window.addEventListener('pointerdown', onPointerDown);
-window.addEventListener('pointermove', onPointerMove);
-window.addEventListener('pointerup', onPointerUp);
-window.addEventListener('keydown', onKeyDown);
-window.addEventListener('keyup', onKeyUp);
-
-window.addEventListener('resize', () => {
+function onResize(): void {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+}
+
+const eventHandlers: Array<{ target: EventTarget; type: string; handler: EventListenerOrEventListenerObject }> = [];
+
+function registerEventHandlers(): void {
+  eventHandlers.push(
+    { target: window, type: 'pointerdown', handler: onPointerDown },
+    { target: window, type: 'pointermove', handler: onPointerMove },
+    { target: window, type: 'pointerup', handler: onPointerUp },
+    { target: window, type: 'keydown', handler: onKeyDown },
+    { target: window, type: 'keyup', handler: onKeyUp },
+    { target: window, type: 'resize', handler: onResize },
+    { target: window, type: 'beforeunload', handler: cleanup },
+  );
+  eventHandlers.forEach(({ target, type, handler }) => target.addEventListener(type, handler));
+}
 
 function animate(): void {
   requestAnimationFrame(animate);
@@ -287,13 +322,17 @@ function animate(): void {
 }
 
 function cleanup(): void {
+  eventHandlers.forEach(({ target, type, handler }) => target.removeEventListener(type, handler));
+  eventHandlers.length = 0;
   cubes.slice().forEach((c) => removeCube(c));
+  audioNodes.forEach((n) => disposeAudioNode(n));
+  audioNodes.clear();
   renderer.dispose();
 }
 
-window.addEventListener('beforeunload', cleanup);
+registerEventHandlers();
 
-Object.assign(window as any, { createCube, cubes, THREE, scene });
+Object.assign(window as any, { createCube, cubes, THREE, scene, audioNodes });
 
 init();
 
