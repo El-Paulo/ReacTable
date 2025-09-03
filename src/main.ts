@@ -20,6 +20,7 @@ camera.position.set(5, 5, 5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x1e1e2f);
 document.body.appendChild(renderer.domElement);
 
 let controls: OrbitControls | null = null;
@@ -37,7 +38,10 @@ const pointer = new THREE.Vector2();
 
 // Mesa
 const planeGeo = new THREE.PlaneGeometry(20, 20);
-const planeMat = new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide });
+const planeMat = new THREE.MeshStandardMaterial({
+  color: 0x00aaff,
+  side: THREE.DoubleSide,
+});
 const plane = new THREE.Mesh(planeGeo, planeMat);
 plane.rotation.x = -Math.PI / 2;
 scene.add(plane);
@@ -45,6 +49,11 @@ scene.add(plane);
 // Iluminación
 const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
 scene.add(light);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 20, 10);
+scene.add(dirLight);
 
 // Audio context
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
